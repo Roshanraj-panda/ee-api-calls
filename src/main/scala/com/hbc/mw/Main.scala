@@ -9,7 +9,7 @@ import zio.http.netty.NettyConfig
 import zio.http.netty.client.NettyClientDriver
 import zio.stream.ZStream
 import zio.{Chunk, Scope, Unsafe, ZIO, ZLayer}
-import zio.http.{Client, DnsResolver, ZClient}
+import zio.http.{Client, ZClient}
 
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
@@ -19,8 +19,7 @@ object Main extends RequestHandler[S3Event,String] {
 
     val clientConfig = ZClient.Config.default
 
-    val app: ZIO[Any, Throwable, Chunk[(String, String)]] = {
-
+    val app: ZIO[Any, Any, Chunk[(String, String)]] = {
 
       for {
         logger <- ZIO.succeed(context.getLogger)
@@ -31,10 +30,17 @@ object Main extends RequestHandler[S3Event,String] {
         tmanager <- ZIO.service[TokenManager]
         _ <- ZIO.succeed(logger.log(s"received s3 events ${input.getRecords.asScala.mkString(",")}"))
         events <- ZIO.succeed(input.getRecords.asScala.toList.map(_.getS3))
-        responses <- ZStream.fromIterable(events).flatMap(s3Serv.downloadKey).mapZIO(r => httpserv.request(config,r,tmanager.Currenttoken.get().get.tokenDetails.access_token)).runCollect
+        responses <- ZStream.fromIterable(events).flatMap(s3Serv.downloadKey).mapZIO { r =>
+          tmanager.getToken(config).flatMap(t => httpserv.request(config,r,t.get.tokenDetails.access_token))
+        }.runCollect
 
       } yield (responses)
-    }.provide(S3Service.s3Live, S3Service.s3ActionLive,AppConfig.live,Scope.default, TokenManager.live, HttpService.layer,Client.customized,
+    }.provide(S3Service.s3Live,
+      S3Service.s3ActionLive,
+      AppConfig.live,
+      Scope.default,
+      TokenManager.live,
+      HttpService.layer,Client.customized,
       NettyClientDriver.live,
       DnsResolver.default,
       ZLayer.succeed(clientConfig),

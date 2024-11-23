@@ -3,11 +3,13 @@ package com.hbc.mw.services
 import com.hbc.mw.configs.AppConfig
 import zio.http.Header.AuthenticationScheme.Bearer
 import zio.http.Header.Authorization
+import zio.http.Method.GET
 import zio.http._
 import zio.schema.{DeriveSchema, Schema}
-import zio.{Ref, ULayer, ZIO, ZLayer}
+import zio.{Chunk, Ref, ULayer, ZIO, ZLayer}
 import zio.json._
 
+import java.net.URI
 import java.time.{LocalDateTime, ZoneId}
 import java.util.concurrent.atomic.AtomicReference
 
@@ -63,19 +65,22 @@ trait OauthManager {
   def generateToken(settings: AppConfig):ZIO[Any with Client, Any, Option[TokenStatus]]
 }
 
+
 case class TokenManager(settings:AppConfig) extends OauthManager {
 
   val Currenttoken:AtomicReference[Option[TokenStatus]] =  new AtomicReference(None)
 
   override def generateToken(settings: AppConfig): ZIO[Any with Client, Any, Option[TokenStatus]] = {
-    val h = Headers(Header.Custom("grant_tyoe",settings.grantType), Header.Custom("scope",settings.apiScope), Header.Authorization.Basic.apply(settings.accessId, settings.accessSecret))
-    val res = Client.request(settings.oAuthDomain, Method.POST,h)
+    val h = Headers(Header.Authorization.Basic.apply(settings.accessId, settings.accessSecret), Header.ContentType(MediaType.application.`json`))
+    val fields = Chunk(FormField.simpleField("grant_type","client_credentials"),FormField.simpleField("scope","api://c4b08e7d-139d-4902-a28d-68cb7541da82/.default"))
     for {
-      response <- res
-      t <- response.body.asString.map(_.fromJson[TokenStatus])
-      res <- ZIO.fromEither(t)
+      response <- Client.request(settings.oAuthDomain, Method.GET,h, Body.fromURLEncodedForm(Form.apply(fields)))
+      strRes <- response.body.asString
+      _ <-   zio.Console.printLine(strRes)
+      t <- ZIO.attempt(strRes.fromJson[Token])
+      re <- ZIO.fromEither(t)
     } yield {
-      Currenttoken.updateAndGet(_ => Option(res) )
+      Currenttoken.updateAndGet(_ => Option(TokenStatus(re)) )
     }
   }
 
