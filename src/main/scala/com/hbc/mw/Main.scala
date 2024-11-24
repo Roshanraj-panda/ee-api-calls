@@ -30,11 +30,14 @@ object Main extends RequestHandler[S3Event,String] {
         tmanager <- ZIO.service[TokenManager]
         _ <- ZIO.succeed(logger.log(s"received s3 events ${input.getRecords.asScala.mkString(",")}"))
         events <- ZIO.succeed(input.getRecords.asScala.toList.map(_.getS3))
-        responses <- ZStream.fromIterable(events).flatMap(s3Serv.downloadKey).mapZIO { r =>
+        responses <- ZStream.fromIterable(events).flatMap(e => s3Serv.getObjectDefault(e)).mapZIO { r =>
           tmanager.getToken(config).flatMap(t => httpserv.request(config,r,t.get.tokenDetails.access_token))
         }.runCollect
 
-      } yield (responses)
+      } yield {
+        println(s"execution compeleted with result ${responses.mkString(",")}")
+        responses
+      }
     }.provide(S3Service.s3Live,
       S3Service.s3ActionLive,
       AppConfig.live,
@@ -44,7 +47,8 @@ object Main extends RequestHandler[S3Event,String] {
       NettyClientDriver.live,
       DnsResolver.default,
       ZLayer.succeed(clientConfig),
-      ZLayer.succeed(NettyConfig.default)
+      ZLayer.succeed(NettyConfig.default),
+      S3Service.defaultClient
     )
 
 

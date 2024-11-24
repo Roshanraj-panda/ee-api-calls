@@ -64,6 +64,7 @@ lazy val root = (project in file("."))
       "dev.zio" %% "zio-http" % versions.zioHttp,
       "dev.zio" %% "zio-config" % versions.config,
       "dev.zio" %% "zio-s3" %  versions.zioS3,
+      "com.amazonaws" % "aws-java-sdk-s3" % versions.awsS3,
       "org.apache.kafka" % "kafka-clients" % versions.apacheKafka,
       "com.amazonaws" % "aws-java-sdk-secretsmanager" % versions.awsS3,
       "com.amazonaws" % "aws-lambda-java-core" % versions.lambdaCore,
