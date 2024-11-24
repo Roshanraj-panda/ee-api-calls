@@ -35,7 +35,7 @@ object Main extends RequestHandler[S3Event,String] {
         }.runCollect
 
       } yield {
-        println(s"execution compeleted with result ${responses.mkString(",")}")
+        println(s"execution completed with result ${responses.mkString(",")}")
         responses
       }
     }.provide(S3Service.s3Live,
@@ -55,7 +55,7 @@ object Main extends RequestHandler[S3Event,String] {
 
     Unsafe.unsafe { implicit unsafe =>
       zio.Runtime.default.unsafe.run(
-        app *> ZIO.succeed("Lambda execution completed")
+        app.as("Lambda execution completed")
       ).getOrThrowFiberFailure()
     }
   }
